@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Armenia Plane Radar</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100vw; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // Initialize the map centered on Yerevan
+        const map = L.map('map').setView([40.1772, 44.5035], 8);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        const markers = {};
+
+        async function updateFlights() {
+            try {
+                const response = await fetch('/api/flights');
+                const flights = await response.json();
+
+                // Keep track of current flight ICAOs to remove those that disappeared
+                const currentIcaos = new Set();
+
+                flights.forEach(flight => {
+                    if (flight.lat && flight.lon) {
+                        currentIcaos.add(flight.icao24);
+                        
+                        const pos = [flight.lat, flight.lon];
+                        const label = `Flight: ${flight.callsign}`;
+
+                        if (markers[flight.icao24]) {
+                            // Update existing marker position
+                            markers[flight.icao24].setLatLng(pos);
+                            markers[flight.icao24].getPopup().setContent(label);
+                        } else {
+                            // Create new marker
+                            const marker = L.marker(pos).addTo(map)
+                                .bindPopup(label);
+                            markers[flight.icao24] = marker;
+                        }
+                    }
+                });
+
+                // Remove markers for flights that are no longer in the data
+                Object.keys(markers).forEach(icao => {
+                    if (!currentIcaos.has(icao)) {
+                        map.removeLayer(markers[icao]);
+                        delete markers[icao];
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error updating flights:", error);
+            }
+        }
+
+        // Initial update and then every 5 seconds
+        updateFlights();
+        setInterval(updateFlights, 5000);
+    </script>
+</body>
+</html>
