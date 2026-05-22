@@ -1,4 +1,4 @@
 fastapi
 uvicorn
 httpx
-FlightRadar24-API
+flightradarapi
