@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
-from FlightRadar24 import FlightRadar24API
+from FlightRadarAPI import FlightRadar24API
 
 app = FastAPI()
 
@@ -23,7 +23,7 @@ async def get_flights():
         flights = []
         for f in flights_data:
             flights.append({
-                "icao24": f.icao_24_addr,
+                "icao24": f.icao_24bit,
                 "callsign": f.callsign if f.callsign else "N/A",
                 "lat": f.latitude,
                 "lon": f.longitude,
