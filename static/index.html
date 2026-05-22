@@ -93,12 +93,12 @@
 
                         if (markers[f.icao24]) {
                             markers[f.icao24].setLatLng(pos);
-                            markers[f.icao24].setRotationAngle(parseFloat(f.heading) || 0);
+                            markers[f.icao24].setRotationAngle(f.heading);
                             markers[f.icao24].getPopup().setContent(content);
                         } else {
                             const marker = L.marker(pos, {
                                 icon: planeIcon,
-                                rotationAngle: parseFloat(f.heading) || 0,
+                                rotationAngle: f.heading,
                                 rotationOrigin: 'center center'
                             }).addTo(map).bindPopup(content);
                             markers[f.icao24] = marker;
