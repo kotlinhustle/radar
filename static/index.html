@@ -3,70 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Armenia Plane Radar</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <title>Armenia Live Radar</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; background: #1a1a1a; }
         #map { height: 100vh; width: 100vw; }
+        
+        /* Dark Theme Popup Styling */
+        .leaflet-popup-content-wrapper {
+            background: #2c2c2c;
+            color: #fff;
+            border-radius: 8px;
+            padding: 5px;
+        }
+        .leaflet-popup-tip {
+            background: #2c2c2c;
+        }
+        .popup-header {
+            border-bottom: 1px solid #444;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            font-weight: bold;
+            color: #00d4ff;
+            font-size: 1.1em;
+        }
+        .popup-row {
+            margin: 4px 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 0.9em;
+        }
+        .label { color: #aaa; }
     </style>
 </head>
 <body>
     <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-rotatedmarker/0.2.0/leaflet.rotatedmarker.min.js"></script>
     <script>
-        // Initialize the map centered on Yerevan
-        const map = L.map('map').setView([40.1772, 44.5035], 8);
+        const map = L.map('map', {
+            zoomControl: false
+        }).setView([40.1772, 44.5035], 8);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap contributors'
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // Dark-themed tiles for a radar look
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
         }).addTo(map);
 
+        const planeSvg = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="30" height="30">
+                <path fill="#00d4ff" d="M448 336v-40L288 192V79.2c0-22.1-17.9-40-40-40s-40 17.9-40 40V192L48 296v40l160-48v113.6l-48 31.2V472l88-24 88 24v-39.2l-48-31.2V288l160 48z"/>
+            </svg>
+        `;
+
+        const planeIcon = L.divIcon({
+            html: planeSvg,
+            className: 'plane-icon',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+
         const markers = {};
+
+        function createPopupContent(f) {
+            return `
+                <div class="popup-header">Flight ${f.callsign}</div>
+                <div class="popup-row"><span class="label">Speed:</span> ${f.velocity} km/h</div>
+                <div class="popup-row"><span class="label">Altitude:</span> ${f.altitude} ft</div>
+                <div class="popup-row"><span class="label">Heading:</span> ${f.heading}°</div>
+                <div class="popup-row"><span class="label">ICAO:</span> ${f.icao24.toUpperCase()}</div>
+            `;
+        }
 
         async function updateFlights() {
             try {
                 const response = await fetch('/api/flights');
                 const flights = await response.json();
-
-                // Keep track of current flight ICAOs to remove those that disappeared
                 const currentIcaos = new Set();
 
-                flights.forEach(flight => {
-                    if (flight.lat && flight.lon) {
-                        currentIcaos.add(flight.icao24);
-                        
-                        const pos = [flight.lat, flight.lon];
-                        const label = `Flight: ${flight.callsign}`;
+                flights.forEach(f => {
+                    if (f.lat && f.lon) {
+                        currentIcaos.add(f.icao24);
+                        const pos = [f.lat, f.lon];
+                        const content = createPopupContent(f);
 
-                        if (markers[flight.icao24]) {
-                            // Update existing marker position
-                            markers[flight.icao24].setLatLng(pos);
-                            markers[flight.icao24].getPopup().setContent(label);
+                        if (markers[f.icao24]) {
+                            markers[f.icao24].setLatLng(pos);
+                            markers[f.icao24].setRotationAngle(f.heading);
+                            markers[f.icao24].getPopup().setContent(content);
                         } else {
-                            // Create new marker
-                            const marker = L.marker(pos).addTo(map)
-                                .bindPopup(label);
-                            markers[flight.icao24] = marker;
+                            const marker = L.marker(pos, {
+                                icon: planeIcon,
+                                rotationAngle: f.heading,
+                                rotationOrigin: 'center center'
+                            }).addTo(map).bindPopup(content);
+                            markers[f.icao24] = marker;
                         }
                     }
                 });
 
-                // Remove markers for flights that are no longer in the data
                 Object.keys(markers).forEach(icao => {
                     if (!currentIcaos.has(icao)) {
                         map.removeLayer(markers[icao]);
                         delete markers[icao];
                     }
                 });
-
             } catch (error) {
-                console.error("Error updating flights:", error);
+                console.error("Radar Error:", error);
             }
         }
 
-        // Initial update and then every 5 seconds
         updateFlights();
         setInterval(updateFlights, 5000);
     </script>

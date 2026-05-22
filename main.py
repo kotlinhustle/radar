@@ -28,7 +28,8 @@ async def get_flights():
                 "lat": f.latitude,
                 "lon": f.longitude,
                 "velocity": f.ground_speed,
-                "heading": f.heading
+                "heading": f.heading,
+                "altitude": f.altitude
             })
         return flights
     except Exception as e:
