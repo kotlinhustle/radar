@@ -33,13 +33,22 @@
             font-size: 0.9em;
         }
         .label { color: #aaa; }
+
+        /* Ensure the icon container itself doesn't have background and transition for smooth movement */
+        .plane-icon-container {
+            background: none;
+            border: none;
+        }
+        .plane-icon-svg {
+            transition: transform 0.5s ease;
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-rotatedmarker/0.2.0/leaflet.rotatedmarker.min.js"></script>
     <script>
         const map = L.map('map', {
             zoomControl: false
@@ -47,27 +56,27 @@
 
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Dark-themed tiles for a radar look
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OpenStreetMap &copy; CARTO',
             subdomains: 'abcd',
             maxZoom: 20
         }).addTo(map);
 
-        const planeSvg = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="30" height="30">
-                <path fill="#00d4ff" d="M448 336v-40L288 192V79.2c0-22.1-17.9-40-40-40s-40 17.9-40 40V192L48 296v40l160-48v113.6l-48 31.2V472l88-24 88 24v-39.2l-48-31.2V288l160 48z"/>
-            </svg>
-        `;
-
-        const planeIcon = L.divIcon({
-            html: planeSvg,
-            className: 'plane-icon',
-            iconSize: [30, 30],
-            iconAnchor: [15, 15]
-        });
-
         const markers = {};
+
+        function getPlaneIcon(heading) {
+            const planeSvg = `
+                <svg class="plane-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="30" height="30" style="transform: rotate(${heading}deg);">
+                    <path fill="#00d4ff" d="M448 336v-40L288 192V79.2c0-22.1-17.9-40-40-40s-40 17.9-40 40V192L48 296v40l160-48v113.6l-48 31.2V472l88-24 88 24v-39.2l-48-31.2V288l160 48z"/>
+                </svg>
+            `;
+            return L.divIcon({
+                html: planeSvg,
+                className: 'plane-icon-container',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+        }
 
         function createPopupContent(f) {
             return `
@@ -92,14 +101,14 @@
                         const content = createPopupContent(f);
 
                         if (markers[f.icao24]) {
+                            // Update existing marker
                             markers[f.icao24].setLatLng(pos);
-                            markers[f.icao24].setRotationAngle(f.heading);
+                            markers[f.icao24].setIcon(getPlaneIcon(f.heading));
                             markers[f.icao24].getPopup().setContent(content);
                         } else {
+                            // Create new marker
                             const marker = L.marker(pos, {
-                                icon: planeIcon,
-                                rotationAngle: f.heading,
-                                rotationOrigin: 'center center'
+                                icon: getPlaneIcon(f.heading)
                             }).addTo(map).bindPopup(content);
                             markers[f.icao24] = marker;
                         }
